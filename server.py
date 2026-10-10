@@ -6,7 +6,7 @@ from urllib.parse import urlparse, parse_qs
 # Low-usage guards
 MAX_TURNS_PER_JOB = 5
 IDLE_TIMEOUT = 300  # 5 min
-VERSION = "6.1-persistent"
+VERSION = "6.2-persistent"
 
 # Disk persistence - survives Render restarts/spin-downs (free tier spins down when idle).
 # NOTE: Render free-tier disk is wiped on redeploy, so state survives restarts but not deploys.
@@ -113,7 +113,12 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/health":
-            self.send_json({"status": "ok", "leader": "KITTY_CAT", "version": VERSION, "time": time.time(), "bots_count": len(bots)})
+            try:
+                st = os.stat(STATE_FILE)
+                state_info = {"exists": True, "size": st.st_size, "modified": st.st_mtime}
+            except:
+                state_info = {"exists": False}
+            self.send_json({"status": "ok", "leader": "KITTY_CAT", "version": VERSION, "time": time.time(), "bots_count": len(bots), "state_file": state_info, "counts": {"history": len(shared_history), "transfers": len(transfers), "jobs": len(jobs), "inbox": {k: len(v) for k, v in inbox.items()}}})
             return
 
         if path == "/manifest":

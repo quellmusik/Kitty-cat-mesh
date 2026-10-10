@@ -1,8 +1,8 @@
 {
   "openapi": "3.0.0",
   "info": {
-    "title": "Kitty Cat (Muse AI) Leader Mesh - Final - Always-On - Low-Usage Safe",
-    "version": "5.0"
+    "title": "Kitty Cat (Muse AI) Leader Mesh - Full - Always-On - Low-Usage Safe",
+    "version": "6.0"
   },
   "servers": [
     {
@@ -68,6 +68,54 @@
       "get": {
         "operationId": "getAutoChat",
         "summary": "Get auto chat log"
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "health",
+        "summary": "Health check"
+      }
+    },
+    "/manifest": {
+      "get": {
+        "operationId": "manifest",
+        "summary": "Full mesh manifest - bots, endpoints, version"
+      }
+    },
+    "/jobs": {
+      "get": {
+        "operationId": "listJobs",
+        "summary": "List all directed jobs"
+      }
+    },
+    "/inbox": {
+      "get": {
+        "operationId": "inbox",
+        "summary": "Per-bot inbox - messages and jobs addressed to a bot (?bot=PRISM)"
+      }
+    },
+    "/prism/status": {
+      "get": {
+        "operationId": "prismStatus",
+        "summary": "Prism status and last activity"
+      }
+    },
+    "/creative-toolkit": {
+      "get": {
+        "operationId": "creativeToolkit",
+        "summary": "Creative capabilities listing"
+      }
+    },
+    "/generate-video": {
+      "post": {
+        "operationId": "generateVideo",
+        "summary": "Queue a video clip generation job for PRISM (Meta AI)"
+      }
+    },
+    "/push-from-metaai": {
+      "post": {
+        "operationId": "pushFromMetaAI",
+        "summary": "Prism pushes finished work back from the Meta AI side"
       }
     }
   }

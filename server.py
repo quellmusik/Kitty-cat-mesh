@@ -6,7 +6,7 @@ from urllib.parse import urlparse, parse_qs
 # Low-usage guards
 MAX_TURNS_PER_JOB = 5
 IDLE_TIMEOUT = 300  # 5 min
-VERSION = "6.2-persistent"
+VERSION = "6.3-talk"
 
 # Disk persistence - survives Render restarts/spin-downs (free tier spins down when idle).
 # NOTE: Render free-tier disk is wiped on redeploy, so state survives restarts but not deploys.
@@ -290,6 +290,30 @@ class Handler(BaseHTTPRequestHandler):
                 "job": jobs[job_id],
                 "message": f"Kitty Cat (Muse AI) is directing for optimal outcome - assigned to {jobs[job_id]['assigned_to']} - just executes, no extra approval"
             })
+            return
+
+        # === TALK - simple talk mode: Kitty Cat talks, Prism makes videos ===
+        if path == "/talk":
+            job_id = f"job_{len(jobs)}"
+            msg = data.get("message", "")
+            prompt = data.get("video_prompt", "")
+            jobs[job_id] = {
+                "id": job_id,
+                "task": "generate_video_clip",
+                "status": "KITTY_CAT_DIRECTING",
+                "assigned_to": ["PRISM"],
+                "turns": 0,
+                "max_turns": MAX_TURNS_PER_JOB,
+                "created": time.time(),
+                "details": {
+                    "message": msg,
+                    "prompt": prompt,
+                    "instructions": "Generate this video clip in Meta AI and push the finished video back via the GitHub file bridge (video_outbox.json)."
+                }
+            }
+            deliver("PRISM", {"kind": "job", "job_id": job_id, "task": "talk", "details": jobs[job_id]["details"], "time": time.time()})
+            add_history(data.get("from", "KITTY_CAT"), "talk", {"job_id": job_id, "message": msg})
+            self.send_json({"ok": True, "job": jobs[job_id], "message": "Talk received - video job queued for PRISM"})
             return
 
         # === VIDEO GENERATION - queue a clip job for PRISM ===

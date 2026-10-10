@@ -6,7 +6,11 @@ from urllib.parse import urlparse, parse_qs
 # Low-usage guards
 MAX_TURNS_PER_JOB = 5
 IDLE_TIMEOUT = 300  # 5 min
-VERSION = "6.0-full"
+VERSION = "6.1-persistent"
+
+# Disk persistence - survives Render restarts/spin-downs (free tier spins down when idle).
+# NOTE: Render free-tier disk is wiped on redeploy, so state survives restarts but not deploys.
+STATE_FILE = os.environ.get("MESH_STATE_FILE", os.path.join(os.path.dirname(os.path.abspath(__file__)), "mesh_state.json"))
 
 bots = {
     "KITTY_CAT": {"id": "KITTY_CAT", "name": "Kitty Cat (Muse AI)", "is_leader": True, "aliases": ["MUSE_AI","Muse AI","Kitty Cat"], "status": "ACTIVE - LEADING", "role": "LEADER - directs optimal outcome, just executes"},
@@ -20,17 +24,52 @@ jobs = {}
 auto_chat_log = []
 inbox = {}  # per-bot inbox: bot_id -> [messages]
 
+def save_state():
+    """Write-through persistence: every mutation hits disk."""
+    try:
+        with open(STATE_FILE, "w") as f:
+            json.dump({
+                "bots": bots,
+                "shared_history": shared_history[-200:],
+                "transfers": transfers[-200:],
+                "jobs": jobs,
+                "auto_chat_log": auto_chat_log[-200:],
+                "inbox": {k: v[-100:] for k, v in inbox.items()},
+            }, f)
+    except Exception as e:
+        print(f"save_state failed: {e}")
+
+def load_state():
+    """Restore state from disk on startup."""
+    global bots, shared_history, transfers, jobs, auto_chat_log, inbox
+    try:
+        with open(STATE_FILE) as f:
+            d = json.load(f)
+        bots = d.get("bots", bots)
+        shared_history = d.get("shared_history", [])
+        transfers = d.get("transfers", [])
+        jobs = d.get("jobs", {})
+        auto_chat_log = d.get("auto_chat_log", [])
+        inbox = d.get("inbox", {})
+        print(f"state restored: {len(shared_history)} history, {len(transfers)} transfers, {len(jobs)} jobs")
+    except FileNotFoundError:
+        print("no saved state - starting fresh")
+    except Exception as e:
+        print(f"load_state failed: {e} - starting fresh")
+
 def add_history(actor, action, data):
     shared_history.append({"time": time.time(), "actor": actor, "action": action, "data": data, "id": len(shared_history)})
     # keep only last 200 to stay low-usage / low-storage
     if len(shared_history) > 200:
         shared_history.pop(0)
+    save_state()
 
 def deliver(bot_id, item):
     """Drop a message/job into a bot's inbox."""
     inbox.setdefault(bot_id, []).append(item)
     if len(inbox[bot_id]) > 100:
         inbox[bot_id].pop(0)
+    save_state()
 
 def bot_last_seen(bot_id):
     """Last activity timestamp for a bot from shared history."""
@@ -334,6 +373,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(obj, indent=2).encode())
 
 if __name__ == "__main__":
+    load_state()
     port = int(os.environ.get("PORT", 8000))
     print(f"🐱 KITTY CAT (MUSE AI) LEADER MESH - FULL v{VERSION} - ALWAYS-ON - LOW-USAGE SAFE")
     print(f"Leader: KITTY_CAT = MUSE AI 👑 - directs optimal outcome, just executes")

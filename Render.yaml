@@ -1,0 +1,7 @@
+services:
+    - type: web
+    name: kitty-cat-mesh-final
+    env: python
+    plan: free
+    buildCommand: ""
+    startCommand: "python server.py"
